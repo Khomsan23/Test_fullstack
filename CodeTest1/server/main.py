@@ -87,3 +87,7 @@ def read_times(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     except Exception as e:
         logging.error(f"Error in read_times: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.delete("/delete-part/{part_no}")
+async def delete_part_endpoint(part_no: str, db: Session = Depends(get_db)):
+    return crud.delete_part(db, part_no)

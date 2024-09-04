@@ -33,7 +33,8 @@
           class="elevation-1 custom-table"
           hide-default-header
         >
-          <template v-slot:header>
+          <!-- ใช้ template หนึ่งตัวสำหรับ header -->
+          <template #header>
             <tr>
               <th
                 v-for="(header, index) in headers"
@@ -44,7 +45,9 @@
               </th>
             </tr>
           </template>
-          <template v-slot:item="{ item }">
+
+          <!-- ใช้ template หนึ่งตัวสำหรับ item -->
+          <template #item="{ item }">
             <tr>
               <td
                 v-for="(header, index) in headers"
@@ -52,6 +55,12 @@
                 :class="getRowCellClass(item[header.value], index)"
               >
                 {{ item[header.value] === "dense" ? "" : item[header.value] }}
+              </td>
+              <!-- เพิ่มปุ่มลบในคอลัมน์สุดท้าย -->
+              <td>
+                <v-btn icon color="red" @click="confirmDelete(item.part_no)">
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
               </td>
             </tr>
           </template>
@@ -143,8 +152,8 @@
           <v-btn
             color="green darken-1"
             text
-            @click="saveNewPart"
             :disabled="!allRelationsSelected"
+            @click="saveNewPart"
           >
             Save
           </v-btn>
@@ -156,6 +165,7 @@
 
 <script>
 import axios from "axios";
+import Swal from "sweetalert2";
 
 export default {
   name: "HomeView",
@@ -352,46 +362,117 @@ export default {
         file.type ===
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       ) {
-        const formData = new FormData();
-        formData.append("file", file);
+        // แสดงการยืนยันด้วย SweetAlert2
+        const result = await Swal.fire({
+          title: "Are you sure?",
+          text: `Do you want to upload the file "${file.name}"?`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Yes, upload it!",
+          cancelButtonText: "No, cancel!",
+        });
 
-        try {
-          const response = await axios.post(
-            "http://localhost:8000/upload-excel/",
-            formData,
-            {
-              headers: {
-                "Content-Type": "multipart/form-data",
-              },
+        if (result.isConfirmed) {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            const response = await axios.post(
+              "http://localhost:8000/upload-excel/",
+              formData,
+              {
+                headers: {
+                  "Content-Type": "multipart/form-data",
+                },
+              }
+            );
+
+            if (response.data && response.data.message) {
+              Swal.fire({
+                icon: "success",
+                title: "Success",
+                text: response.data.message,
+              });
+            } else {
+              Swal.fire({
+                icon: "success",
+                title: "Success",
+                text: "Excel file uploaded successfully.",
+              });
             }
-          );
 
-          // ตรวจสอบการตอบกลับจาก API
-          if (response.data && response.data.message) {
-            alert(response.data.message);
-          } else {
-            alert("Excel file uploaded successfully.");
+            await this.fetchData();
+          } catch (error) {
+            console.error("Error uploading Excel file:", error);
+            if (
+              error.response &&
+              error.response.data &&
+              error.response.data.detail
+            ) {
+              Swal.fire({
+                icon: "error",
+                title: "Upload Failed",
+                text: `Failed to upload Excel file: ${error.response.data.detail}`,
+              });
+            } else {
+              Swal.fire({
+                icon: "error",
+                title: "Upload Failed",
+                text: "Failed to upload Excel file. Please try again.",
+              });
+            }
           }
-
-          // รีเฟรชข้อมูลหลังจากอัปโหลด
-          await this.fetchData();
-        } catch (error) {
-          console.error("Error uploading Excel file:", error);
-          if (
-            error.response &&
-            error.response.data &&
-            error.response.data.detail
-          ) {
-            alert(`Failed to upload Excel file: ${error.response.data.detail}`);
-          } else {
-            alert("Failed to upload Excel file. Please try again.");
-          }
+        } else if (result.dismiss === Swal.DismissReason.cancel) {
+          Swal.fire({
+            icon: "info",
+            title: "Cancelled",
+            text: "Your file was not uploaded.",
+          });
         }
 
-        // รีเซ็ต input file หลังการอัปโหลด
         this.$refs.fileInput.value = "";
       } else {
-        alert("Please select a valid Excel file.");
+        Swal.fire({
+          icon: "warning",
+          title: "Invalid File",
+          text: "Please select a valid Excel file.",
+        });
+      }
+    },
+    async confirmDelete(partNo) {
+      const result = await Swal.fire({
+        title: "Are you sure?",
+        text: `Do you want to delete part "${partNo}"? This action cannot be undone.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, delete it!",
+        cancelButtonText: "No, cancel!",
+      });
+
+      if (result.isConfirmed) {
+        this.deletePart(partNo);
+      }
+    },
+
+    async deletePart(partNo) {
+      try {
+        await axios.delete(`http://localhost:8000/delete-part/${partNo}`);
+
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: `Part "${partNo}" has been deleted.`,
+        });
+
+        // เรียก fetchData() เพื่อรีเฟรชข้อมูลในตารางหลังจากลบ
+        await this.fetchData();
+      } catch (error) {
+        console.error("Error deleting part:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Delete Failed",
+          text: "Failed to delete the part. Please try again.",
+        });
       }
     },
   },

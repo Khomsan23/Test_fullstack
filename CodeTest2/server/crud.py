@@ -63,11 +63,6 @@ def add_new_part(db: Session, new_part_data: NewPartData):
         db.rollback()
         raise e  # Re-raise the exception to be handled by the calling code
 
-
-
-
-
-
 def get_parts_with_times(db: Session):
     parts = db.query(Part).all()
     
@@ -99,8 +94,6 @@ def get_parts_with_times(db: Session):
         'headers': headers,
         'rows': rows
     }
-
-
 
 def generate_excel_file(db: Session) -> str:
     data = get_parts_with_times(db)

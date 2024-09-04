@@ -63,11 +63,6 @@ def add_new_part(db: Session, new_part_data: NewPartData):
         db.rollback()
         raise e  # Re-raise the exception to be handled by the calling code
 
-
-
-
-
-
 def get_parts_with_times(db: Session):
     parts = db.query(Part).all()
     
@@ -99,8 +94,6 @@ def get_parts_with_times(db: Session):
         'headers': headers,
         'rows': rows
     }
-
-
 
 def generate_excel_file(db: Session) -> str:
     data = get_parts_with_times(db)
@@ -283,3 +276,16 @@ def process_excel_file(db: Session, file_path: str):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def delete_part(db: Session, part_no: str):
+    part = db.query(Part).filter(Part.part_no == part_no).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Part not found")
+    
+    db.query(Time).filter(
+        (Time.start_part_id == part.id) | (Time.end_part_id == part.id)
+    ).delete(synchronize_session=False)
+    
+    db.delete(part)
+    db.commit()
+    return {"message": "Part deleted successfully"}
